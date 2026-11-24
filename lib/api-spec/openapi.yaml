@@ -1,0 +1,434 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: renal-cancer-study
+    description: Physician-owned renal cancer research records
+paths:
+  /auth/config:
+    get:
+      operationId: getAuthPublicConfig
+      summary: Public authentication configuration, never administrative credentials
+      responses:
+        "200":
+          description: Authentication provider and public Supabase settings when enabled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/AuthPublicConfig" }
+        "503":
+          description: Authentication has not been configured
+  /breast/cases:
+    get:
+      operationId: listBreastCases
+      responses:
+        "200":
+          description: All coded breast cases, visible to authenticated physicians
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/BreastCase" }
+    post:
+      operationId: createBreastCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BreastCaseInput" }
+      responses:
+        "201":
+          description: Created breast case
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreastCase" }
+  /breast/cases/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer } }
+    get:
+      operationId: getBreastCase
+      responses:
+        "200":
+          description: Breast case; canEdit is server-derived
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreastCase" }
+    put:
+      operationId: updateBreastCase
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/BreastCaseInput" }
+      responses:
+        "200":
+          description: Updated by original author only
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreastCase" }
+    delete:
+      operationId: deleteBreastCase
+      responses:
+        "204": { description: Deleted by original author only }
+  /breast/catalog:
+    get:
+      operationId: getBreastCatalog
+      responses:
+        "200":
+          description: Recording choices, not treatment recommendations or local availability claims
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreastCatalog" }
+  /breast/summary:
+    get:
+      operationId: getBreastSummary
+      responses:
+        "200":
+          description: Breast-only counts across participating physicians
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BreastSummary" }
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /study/summary:
+    get:
+      operationId: getStudySummary
+      tags: [renal-cancer-study]
+      summary: Get the signed-in physician's study overview
+      responses:
+        "200":
+          description: Study overview
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StudySummary"
+  /cases:
+    get:
+      operationId: listCases
+      tags: [renal-cancer-study]
+      summary: List the signed-in physician's coded cases
+      responses:
+        "200":
+          description: Coded case list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/PatientCase"
+    post:
+      operationId: createCase
+      tags: [renal-cancer-study]
+      summary: Create a coded renal cancer case
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseInput"
+      responses:
+        "201":
+          description: Created case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientCase"
+  /cases/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema:
+          type: integer
+    get:
+      operationId: getCase
+      tags: [renal-cancer-study]
+      summary: Get a coded renal cancer case
+      responses:
+        "200":
+          description: Case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientCase"
+        "404":
+          description: Case not found
+    put:
+      operationId: updateCase
+      tags: [renal-cancer-study]
+      summary: Replace a coded case and its treatment lines
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CaseInput"
+      responses:
+        "200":
+          description: Updated case
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientCase"
+        "404":
+          description: Case not found
+    delete:
+      operationId: deleteCase
+      tags: [renal-cancer-study]
+      summary: Delete a coded case
+      responses:
+        "204":
+          description: Case deleted
+        "404":
+          description: Case not found
+components:
+  schemas:
+    AuthPublicConfig:
+      type: object
+      required: [provider]
+      properties:
+        provider: { type: string, enum: [clerk, supabase] }
+        supabaseUrl: { type: string }
+        publishableKey: { type: string }
+    BreastCaseInput:
+      type: object
+      required: [patientCode, hospital, diagnosisDate, clinicalT, clinicalN, clinicalM, clinicalStage, histology, subtype, erStatus, prStatus, her2Ihc, her2Ish, her2Expression, vitalStatus, diseaseStatus, treatmentResponse, lastFollowUpDate, treatments]
+      properties:
+        patientCode: { type: string, minLength: 1, maxLength: 60 }
+        hospital: { type: string, minLength: 1, maxLength: 160 }
+        diagnosisDate: { type: string, format: date }
+        clinicalT: { type: string, enum: [cTX, cT0, cTis, cT1mi, cT1a, cT1b, cT1c, cT2, cT3, cT4a, cT4b, cT4c, cT4d] }
+        clinicalN: { type: string, enum: [cNX, cN0, cN1, cN2a, cN2b, cN3a, cN3b, cN3c] }
+        clinicalM: { type: string, enum: [cM0, cM1, Not assessed] }
+        clinicalStage: { type: string, enum: [Stage I, Stage IA, Stage IB, Stage II, Stage IIA, Stage IIB, Stage III, Stage IIIA, Stage IIIB, Stage IIIC, Stage IV] }
+        histology: { type: string, enum: [Invasive carcinoma of no special type, Invasive lobular carcinoma, Mixed ductal and lobular carcinoma, Metaplastic carcinoma, Other, Unknown] }
+        subtype: { type: string, enum: [Triple-negative, Luminal A-like, Luminal B-like, HER2-positive / HR-negative, HER2-positive / HR-positive, Not classified] }
+        erStatus: { type: string, enum: [Positive, Negative, Unknown] }
+        prStatus: { type: string, enum: [Positive, Negative, Unknown] }
+        erPercent: { type: [number, "null"], minimum: 0, maximum: 100 }
+        prPercent: { type: [number, "null"], minimum: 0, maximum: 100 }
+        ki67Percent: { type: [number, "null"], minimum: 0, maximum: 100 }
+        her2Ihc: { type: string, enum: ["0", "1+", "2+", "3+", Unknown] }
+        her2Ish: { type: string, enum: [Positive, Negative, Not performed, Unknown] }
+        her2Expression: { type: string, enum: [HER2-positive, HER2-low, HER2-negative (not low), Unknown] }
+        vitalStatus: { type: string, enum: [Alive, Deceased, Unknown] }
+        diseaseStatus: { type: string, enum: [No evidence of disease, Stable disease, Progression / recurrence, Not assessed] }
+        treatmentResponse: { type: string, enum: [Complete response, Partial response, Stable disease, Progressive disease, Not assessed] }
+        lastFollowUpDate: { type: string, format: date }
+        deathDate: { type: [string, "null"], format: date }
+        treatments:
+          type: array
+          maxItems: 50
+          items: { $ref: "#/components/schemas/BreastTreatmentInput" }
+    BreastTreatmentInput:
+      type: object
+      required: [sequenceNumber, lineNumber, setting, phase, regimen, startDate, endDate, ongoing]
+      properties:
+        sequenceNumber: { type: integer, minimum: 1 }
+        lineNumber: { type: integer, minimum: 1 }
+        setting: { type: string, enum: [Neoadjuvant, Adjuvant, Post-neoadjuvant, Metastatic] }
+        phase: { type: string, enum: [Induction, Maintenance, Other] }
+        regimen: { type: string, minLength: 1, maxLength: 250 }
+        startDate: { type: string, format: date }
+        endDate: { type: [string, "null"], format: date }
+        ongoing: { type: boolean }
+    BreastCase:
+      allOf:
+        - { $ref: "#/components/schemas/BreastCaseInput" }
+        - type: object
+          required: [id, authorName, canEdit, tnmEdition, createdAt, updatedAt]
+          properties:
+            id: { type: integer }
+            authorName: { type: string }
+            tnmEdition: { type: string, enum: [AJCC8] }
+            canEdit: { type: boolean }
+            createdAt: { type: string, format: date-time }
+            updatedAt: { type: string, format: date-time }
+    BreastCatalog:
+      type: object
+      required: [regimens]
+      properties:
+        regimens:
+          type: array
+          items: { $ref: "#/components/schemas/BreastRegimen" }
+    BreastRegimen:
+      type: object
+      required: [name, settings, phases]
+      properties:
+        name: { type: string }
+        settings: { type: array, items: { type: string } }
+        phases: { type: array, items: { type: string } }
+        subtypes:
+          type: array
+          description: Reported subtypes whose agreed study catalog includes this regimen
+          items: { type: string }
+        note:
+          type: string
+          description: Recording context or eligibility caveat; not prescribing advice
+    BreastSummary:
+      type: object
+      required: [totalCases, myCases, activeTreatments, noEvidenceOfDiseaseCases, progressiveCases, deceasedCases]
+      properties:
+        totalCases: { type: integer }
+        myCases: { type: integer }
+        activeTreatments: { type: integer }
+        noEvidenceOfDiseaseCases: { type: integer }
+        progressiveCases: { type: integer }
+        deceasedCases: { type: integer }
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    TreatmentInput:
+      type: object
+      properties:
+        regimen:
+          type: string
+          minLength: 1
+        startDate:
+          type: string
+          format: date
+        endDate:
+          type: ["string", "null"]
+          format: date
+        ongoing:
+          type: boolean
+        clinicalResponse:
+          type: ["string", "null"]
+          enum: ["Complete response", "Partial response", "Stable disease", "Progressive disease", "Not assessed", null]
+          description: Clinician-documented response for this treatment line only. Null means unclassified pending review. Never inferred from global response or disease status; no RECIST calculation.
+        discontinuationReason:
+          type: ["string", "null"]
+          enum: ["Planned completion", "Progression", "Toxicity", "Death", "Other", "Not documented", null]
+          description: Documented reason this line was stopped. Null means unclassified pending review, distinct from an explicitly reviewed Not documented reason. Never inferred from dates or vital status.
+      required: [regimen, startDate, endDate, ongoing]
+    TreatmentLine:
+      allOf:
+        - $ref: "#/components/schemas/TreatmentInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            sequenceNumber:
+              type: integer
+          required: [id, sequenceNumber]
+    CaseInput:
+      type: object
+      properties:
+        patientCode:
+          type: string
+          minLength: 1
+          maxLength: 80
+        hospital:
+          type: string
+          minLength: 1
+          maxLength: 200
+        diagnosisDate:
+          type: string
+          format: date
+        tnmEdition:
+          type: string
+          enum: ["AJCC 8th edition"]
+        clinicalT:
+          type: string
+        clinicalN:
+          type: string
+        clinicalM:
+          type: string
+        clinicalStage:
+          type: string
+          enum: ["Stage I", "Stage II", "Stage III", "Stage IV"]
+        histology:
+          type: string
+        prognosticFactors:
+          type: array
+          items:
+            type: string
+        outcome:
+          type: string
+          deprecated: true
+          description: Historical combined outcome, retained for reading legacy records only. New writes use independent vital, disease, and response fields.
+          enum: ["Stable disease", "Progressive disease", "Deceased", "Partial response", "Complete response", "Not assessed"]
+        vitalStatus:
+          type: ["string", "null"]
+          enum: ["Alive", "Deceased", "Unknown", null]
+          description: Null only for records not yet reviewed under the independent follow-up model.
+        diseaseStatus:
+          type: ["string", "null"]
+          enum: ["No evidence of disease", "Stable disease", "Progression / recurrence", "Not assessed", null]
+        treatmentResponse:
+          type: ["string", "null"]
+          enum: ["Complete response", "Partial response", "Stable disease", "Progressive disease", "Not assessed", null]
+        lastFollowUpDate:
+          type: ["string", "null"]
+          format: date
+          description: Date of the latest documented follow-up. Required on new records and edits.
+        deathDate:
+          type: ["string", "null"]
+          format: date
+          description: Required when vitalStatus is Deceased; otherwise null.
+        treatments:
+          type: array
+          items:
+            $ref: "#/components/schemas/TreatmentInput"
+      required: [patientCode, hospital, diagnosisDate, tnmEdition, clinicalT, clinicalN, clinicalM, clinicalStage, histology, prognosticFactors, treatments]
+    PatientCase:
+      allOf:
+        - $ref: "#/components/schemas/CaseInput"
+        - type: object
+          properties:
+            id:
+              type: integer
+            createdAt:
+              type: string
+              format: date-time
+            updatedAt:
+              type: string
+              format: date-time
+            treatments:
+              type: array
+              items:
+                $ref: "#/components/schemas/TreatmentLine"
+          required: [id, createdAt, updatedAt]
+    StudySummary:
+      type: object
+      properties:
+        totalCases:
+          type: integer
+        activeTreatments:
+          type: integer
+        stableCases:
+          type: integer
+        progressiveCases:
+          type: integer
+        noEvidenceOfDiseaseCases:
+          type: integer
+        deceasedCases:
+          type: integer
+        recentCases:
+          type: array
+          items:
+            $ref: "#/components/schemas/PatientCase"
+      required: [totalCases, activeTreatments, stableCases, progressiveCases, noEvidenceOfDiseaseCases, deceasedCases, recentCases]
+
